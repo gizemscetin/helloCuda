@@ -5,13 +5,24 @@ typedef std::chrono::high_resolution_clock Clock;
 
 using namespace std;
 
+__global__ void VectorMult(int *res, int *op1, int *op2, int n)
+{
+	int i = blockIdx.x * blockDim.x + threadIdx.x;
+	int step = blockDim.x * gridDim.x;
+	for (; i < n; i += step)
+	{
+		res[i] = op1[i] * op2[i];
+	}
+}
+
 
 __global__ void VectorAdd(int *res, int *op1, int *op2, int n)
 {
-	//int i = blockIdx.x;
-	int i = threadIdx.x;
-	//for (int i = 0; i < n; i++)
-	if (i < n)
+	//int i = threadIdx.x;
+	//int step = blockDim.x;
+	int i = blockIdx.x * blockDim.x + threadIdx.x;
+	int step = blockDim.x * gridDim.x;
+	for (; i < n; i+=step)
 	{
 		res[i] = op1[i] + op2[i];
 	}
@@ -19,7 +30,7 @@ __global__ void VectorAdd(int *res, int *op1, int *op2, int n)
 
 int main()
 {
-	const int N = 1000;//32000000;
+	const int N = 1000000;//1048576;//32000000;
 	int *a, *b, *c;
 
 	//a = new int[N];
@@ -37,19 +48,22 @@ int main()
 
 	auto t1 = Clock::now();
 	//VectorAdd(c, a, b, N);
-	VectorAdd << <1, N >> > (c, a, b, N);
+	int blockSize = 1024;
+	int numBlocks = (N + blockSize - 1) / blockSize;
+	//VectorAdd <<<numBlocks, blockSize >>> (c, a, b, N);
+	VectorMult << <numBlocks, blockSize >> > (c, a, b, N);
 	auto t2 = Clock::now();
 	cudaDeviceSynchronize();
 
 
-	for (int i = 0; i < N; i++)
+	for (int i = N-5; i < N; i++)
 	{
 		cout << c[i] << endl;
 	}
 
 	std::cout << "Time: "
-		<< std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count()
-		<< " nanoseconds" << std::endl;
+		<< std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count()
+		<< " milliseconds" << std::endl;
 
 	//delete[] a;
 	//delete[] b;
